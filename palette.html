@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Palette-Based Quantization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 20px;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 20px auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Palette-Based Image Quantization</h1>
+    <input type="file" id="upload" accept="image/*">
+    <canvas id="outputCanvas"></canvas>
+
+    <script>
+        const worker = new Worker('paletteWorker.js');
+        const uploadInput = document.getElementById('upload');
+        const outputCanvas = document.getElementById('outputCanvas');
+        const ctx = outputCanvas.getContext('2d');
+
+        // Define a fixed color palette (web-safe colors in this case)
+        const palette = [
+            [0, 0, 0], [255, 255, 255], [255, 0, 0], [0, 255, 0], [0, 0, 255],
+            [255, 255, 0], [0, 255, 255], [255, 0, 255], [128, 128, 128]
+        ];
+
+        uploadInput.addEventListener('change', handleImageUpload);
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const img = new Image();
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                img.src = e.target.result;
+                img.onload = () => {
+                    outputCanvas.width = img.width;
+                    outputCanvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    const imageData = ctx.getImageData(0, 0, img.width, img.height);
+                    processWithWorker(imageData);
+                };
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        function processWithWorker(imageData) {
+            worker.postMessage({ imageData, palette });
+
+            worker.onmessage = function(e) {
+                const quantizedImageData = e.data;
+                ctx.putImageData(quantizedImageData, 0, 0);
+            };
+        }
+    </script>
+</body>
+</html>
